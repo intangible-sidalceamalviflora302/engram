@@ -81,104 +81,48 @@ curl -X POST http://localhost:4200/recall \
 ## What's New in v5.7
 
 ### BGE-large 1024-dim Embeddings
-
-Replaced MiniLM-L6-v2 (384-dim, @huggingface/transformers) with **BGE-large-en-v1.5** (1024-dim) using raw `onnxruntime-node` and a hand-written BERT WordPiece tokenizer. No wrapper libraries — pure ONNX inference with mean pooling and L2 normalization.
-
-- **1024 dimensions** — significantly better semantic discrimination vs 384-dim
-- **512-token context** — 2x MiniLM's 256-token limit
-- **Quantized INT8** — 337MB model, sub-200ms per embedding on CPU
-- **Auto-migration** — existing 384-dim embeddings re-embedded on first startup
+Replaced MiniLM-L6-v2 (384-dim) with **BGE-large-en-v1.5** (1024-dim) using raw `onnxruntime-node` and a hand-written BERT WordPiece tokenizer. 1024 dimensions, 512-token context, quantized INT8 (337MB, sub-200ms on CPU). Auto-migration re-embeds existing vectors on first startup.
 
 ### Episodic Memory
-
-Conversation episodes are now first-class embedded, searchable objects:
-
-- **Episode embeddings** — summaries embedded with BGE-large for semantic search
-- **Episode FTS5** — full-text search across episode titles and summaries
-- **Temporal search** — `GET /episodes?after=&before=` for date range queries
-- **Semantic search** — `GET /episodes?query=` for meaning-based episode retrieval
-- **Episode finalize** — `POST /episodes/:id/finalize` generates narrative summary from linked memories
-- **Context injection** — episode summaries automatically included in `/context` responses
-- **FSRS decay** — episodes participate in spaced repetition like any other memory
-
-### Benchmark Features (LongMemEval, LoCoMo, ConvoMem)
-
-- **Abstention** — configurable `ENGRAM_SEARCH_MIN_SCORE` (default 0.58). Returns `abstained: true` with empty results when top semantic score is below threshold. Prevents false positives.
-- **Assistant recall** — LLM extraction prompt + regex patterns capture what the AI recommended, implemented, fixed, or produced. Stored as structured facts with `subject: "assistant"`.
-- **Temporal sort** — `temporal_sort: "asc"` or `"desc"` in `/search` orders results chronologically instead of by relevance.
-- **2-hop graph traversal** — relationship expansion reaches 2 levels deep (diminished scoring on hop 2) for multi-hop QA.
-- **Implicit connection inference** — LLM post-processing in `/context` identifies unstated relationships between returned memories.
+Conversation episodes as first-class embedded, searchable objects — BGE-large embeddings, FTS5 search, temporal date-range queries, semantic search, `POST /episodes/:id/finalize` for narrative summaries, FSRS decay, and automatic `/context` injection.
 
 ### Multi-Tenant Data Isolation
+Complete security audit of all cross-tenant boundaries. User-scoped embedding cache, ownership checks on all endpoints, conversation isolation, write scope enforcement, user-scoped stats, and user-filtered graph BFS.
 
-Complete security audit and fix of all cross-tenant data boundaries:
+### Guardrails
+`POST /guard` — agents submit proposed actions, Engram checks stored rules for conflicts. Returns `allow`, `warn`, or `block` with matched rule context.
 
-- **User-scoped embedding cache** — `getCachedEmbeddings` now filters by `user_id`, preventing cross-user data leakage in search, auto-linking, contradiction detection, deduplication, and fact extraction.
-- **Ownership checks on all endpoints** — every GET/POST/PATCH/DELETE that operates on a specific resource (memory, conversation, entity, project, episode, link, version chain) now verifies the authenticated user owns it.
-- **Conversation isolation** — all conversation queries filter by `user_id`. Message search is scoped to the authenticated user's conversations.
-- **Write scope enforcement** — mutating endpoints require write scope.
-- **Stats scoped to user** — `/stats` consolidated from 13 unfiltered queries to 4 user-scoped queries.
-- **Graph BFS user-filtered** — graph traversal joins against `memories` to prevent cross-user node discovery.
+### Benchmark Features
+Abstention (`ENGRAM_SEARCH_MIN_SCORE`), assistant recall (LLM + regex extraction of AI actions), temporal sort, 2-hop graph traversal, implicit connection inference in `/context`.
 
-### Node.js 22 Runtime (Primary) (v5.6)
+### Architecture Refactor
+Monolith `server.ts` replaced by `server-split.ts` + modular `src/routes/`.
 
-- **Node.js 22+ as primary runtime** — `node --experimental-strip-types` for native TypeScript support. Bun support maintained for compatibility.
-- **Optimized MCP server** — rewritten for Node.js, reduced from 529 to 168 lines. Faster startup, lower memory footprint.
-- **vitest test framework** — 76+ test cases covering API, FSRS, indexing, and CLI.
+<details>
+<summary><strong>Previous releases</strong></summary>
 
-### Graph Intelligence Layer
+#### v5.6 — Node.js 22, Graph Intelligence
+- Node.js 22+ as primary runtime (`--experimental-strip-types`), Bun maintained for compatibility
+- Optimized MCP server (529 → 168 lines), vitest framework (76+ tests)
+- Graphology knowledge graph — centrality, shortest paths, community detection, relationship inference
 
-- **Graphology integration** — store memories as knowledge graph nodes with relationship edges.
-- **Auto-linking metrics** — compute centrality, shortest paths, community detection.
-- **Relationship inference** — LLM extracts "mentions", "depends_on", "causes", "related_to" edges from memory content.
-- **Graph visualization** — updated galaxy view shows relationship strength.
+#### v5.5 — Intelligence Layer
+- LLM fact extraction, auto-tagging, relationship classification
+- Conversation extraction, URL ingest, reflections, derived memories, auto-consolidation
+- MCP server improvements — error handling, streaming, tool introspection
 
-### MCP Server Improvements
+#### v5.3 — Security Hardening
+- Auth required by default, rate limit fix, body size limits
+- GUI auth rate limiting, timing-safe password comparison
+- Security headers, CORS origin pinning, IP allowlisting
+- Audit trail, structured JSON logging
 
-- **Better error handling** — detailed error context propagated to Claude Desktop.
-- **Streaming responses** — large memory exports use progress streams.
-- **Tool introspection** — dynamic tool discovery for client apps.
+#### v5.0 — FSRS-6 Spaced Repetition
+- 21-parameter power-law forgetting curve (ported from open-spaced-repetition/fsrs4anki)
+- Dual-strength model (Bjork & Bjork 1992): storage strength + retrieval strength
+- Formula: `R = (1 + factor * t/S)^(-w20)`
 
-### Security Hardening (v5.3+)
-
-- **Auth required by default** — unauthenticated requests are rejected. Set `ENGRAM_OPEN_ACCESS=1` for single-user mode.
-- **Rate limit fix** — rate-limited requests no longer escalate to admin privileges.
-- **Body size limits** — 1MB per request, 100KB per memory content (configurable).
-- **GUI auth rate limiting** — 5 attempts per minute, 10-minute lockout.
-- **Timing-safe password comparison** — `timingSafeEqual` for GUI auth.
-- **Security headers** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy` on every response.
-- **CORS origin pinning** — `ENGRAM_CORS_ORIGIN` instead of wildcard `*`.
-- **IP allowlisting** — `ENGRAM_ALLOWED_IPS` restricts access to specific addresses.
-- **Env var cleanup** — `ENGRAM_PORT`/`ENGRAM_HOST` (old `ZANMEMORY_*` still works with deprecation warning).
-
-### Audit Trail
-
-Every mutation is logged to the `audit_log` table:
-
-```bash
-curl http://localhost:4200/audit?limit=5 \
-  -H "Authorization: Bearer eg_your_key"
-```
-
-### Structured Logging
-
-All output is JSON with configurable levels:
-
-```json
-{"level":"info","ts":"2026-03-10T09:32:06Z","msg":"server_started","version":"5.3","port":4200}
-```
-
-Levels: `debug`, `info`, `warn`, `error`, `none`. Set via `ENGRAM_LOG_LEVEL`.
-
-### FSRS-6 Spaced Repetition (v5.0)
-
-Replaces simple exponential decay with **FSRS-6** — a 21-parameter algorithm trained on millions of Anki reviews. Memory decay follows a **power-law forgetting curve**.
-
-**Key formula:** `R = (1 + factor × t/S)^(-w₂₀)` where S is stability (days until 90% recall probability).
-
-Every memory access is an implicit FSRS review. The **dual-strength model** (Bjork & Bjork 1992) tracks:
-- **Storage strength** — increases with each access, never decays (long-term consolidation)
-- **Retrieval strength** — decays via power law, reset on access (current accessibility)
+</details>
 
 ---
 
